@@ -138,7 +138,12 @@ class JsonFileStore(BaseStore):
             user = db["users"].get(user_id)
             if not user:
                 return None
-            user.setdefault("profile", {}).update(updates or {})
+            profile = user.setdefault("profile", {})
+            for key, value in (updates or {}).items():
+                if value is None:
+                    profile.pop(key, None)  # null clears the field
+                else:
+                    profile[key] = value
             self._save(db)
             return dict(user["profile"])
 

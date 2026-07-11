@@ -68,7 +68,12 @@ class ToolRegistry:
         if not tool:
             return f"Error: unknown tool '{name}'"
         try:
-            result = tool["handler"](user_id, **(inputs or {}))
+            kwargs = dict(inputs or {})
+            # Models sometimes pass JSON null as the string "null"
+            for k, v in list(kwargs.items()):
+                if isinstance(v, str) and v.strip().lower() in ("null", "none", "undefined"):
+                    kwargs[k] = None
+            result = tool["handler"](user_id, **kwargs)
             if isinstance(result, (dict, list)):
                 return json.dumps(result)
             return str(result)
@@ -85,7 +90,14 @@ def _get_profile(user_id):
     return profile if profile else "Profile is empty - no data yet."
 
 
-def _update_profile(user_id, field, value):
+def _update_profile(user_id, field, value=None):
+    """Save or clear one profile field. value=None deletes the field."""
+    field = (field or "").strip() if isinstance(field, str) else str(field or "")
+    if not field:
+        return "Error: field is required."
+    if value is None or (isinstance(value, str) and not value.strip()):
+        updated = store.update_profile(user_id, {field: None})
+        return f"Cleared profile.{field}" if updated is not None else "Error: user not found."
     updated = store.update_profile(user_id, {field: value})
     return f"Saved profile.{field} = {value!r}" if updated is not None else "Error: user not found."
 
@@ -150,14 +162,18 @@ def default_registry() -> ToolRegistry:
     )
     registry.register(
         "update_profile",
-        "Save or update one field in the user's profile, e.g. their name, goals, or preferences.",
+        "Save or update one field in the user's profile, e.g. their name, goals, or preferences. "
+        "Pass value=null to clear/remove a field.",
         {
             "type": "object",
             "properties": {
                 "field": {"type": "string", "description": "Profile field name"},
-                "value": {"type": "string", "description": "Value to save"},
+                "value": {
+                    "description": "Value to save, or null to clear the field",
+                    "anyOf": [{"type": "string"}, {"type": "null"}],
+                },
             },
-            "required": ["field", "value"],
+            "required": ["field"],
         },
         _update_profile,
     )

@@ -194,7 +194,12 @@ class SpacesStore(BaseStore):
             user = self._get_json(f"users/{user_id}.json")
             if not user:
                 return None
-            user.setdefault("profile", {}).update(updates or {})
+            profile = user.setdefault("profile", {})
+            for key, value in (updates or {}).items():
+                if value is None:
+                    profile.pop(key, None)  # null clears the field
+                else:
+                    profile[key] = value
             self._put_json(f"users/{user_id}.json", user)
             return dict(user["profile"])
 

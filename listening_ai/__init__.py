@@ -24,7 +24,7 @@ from .llm import (
 )
 from .brevity import shorten_reply, normalize_level as normalize_reply_brevity
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 __all__ = [
     "Settings",

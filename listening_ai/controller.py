@@ -10,6 +10,7 @@ with tools first and post-parses the final text into a shorter listen-first repl
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import llm
@@ -25,10 +26,25 @@ using your tools rather than making the user repeat themselves or dig through me
 
 Guidelines:
 - Use tools to read or update the user's profile, settings, inbox, and notifications instead of \
-guessing at their state.
+guessing at their state. Never print JSON as a substitute for calling a tool.
 - Keep replies short and conversational (a few sentences), not long essays.
 - If a tool call fails, tell the user plainly what happened rather than pretending it worked.
 """
+
+# Text that looks like the model tried to write profile/tool JSON instead of calling tools
+_FAKE_ACTION_RE = re.compile(
+    r'(\{[^{}]{0,200}\}|'
+    r'\*\*PROFILE[_ ]UPDATE\*\*|'
+    r'\bupdate_profile\b|\blog_health_data\b|'
+    r'WRITE\s+command|profile\s+JSON)',
+    re.I,
+)
+
+
+def _text_looks_like_unexecuted_actions(text: str) -> bool:
+    if not text:
+        return False
+    return bool(_FAKE_ACTION_RE.search(text))
 
 
 class ChatController:
@@ -107,6 +123,7 @@ class ChatController:
 
         # Work on a copy so callers can keep their original list
         working = list(messages)
+        recovery_used = False
 
         for _step in range(self.max_steps):
             resp = llm.call_llm_with_tools(
@@ -126,32 +143,51 @@ class ChatController:
                 final_text = resp["text"]
 
             tool_calls = resp.get("tool_calls") or []
-            if not tool_calls or resp.get("stop_reason") == "end_turn":
-                break
+            if tool_calls:
+                working.append(resp["raw_message"])
+                tool_results = []
+                for tc in tool_calls:
+                    result = self.tools.execute(tc["name"], tc["input"], user_id)
+                    tool_log.append({
+                        "name": tc["name"],
+                        "input": tc["input"],
+                        "result": result,
+                    })
+                    tool_results.append({
+                        "role": "tool",
+                        "tool_call_id": tc["id"],
+                        "content": result,
+                    })
+                    print(f"[ChatController] tool {tc['name']}({tc.get('input')}) → {str(result)[:100]}")
+                working.extend(tool_results)
+                continue
 
-            working.append(resp["raw_message"])
+            # No tool calls — if the model dumped profile/action JSON as text, force one recovery turn
+            if (
+                tool_schemas
+                and not recovery_used
+                and _text_looks_like_unexecuted_actions(final_text or "")
+            ):
+                recovery_used = True
+                print("[ChatController] recovery: model wrote actions as text; forcing tool calls")
+                working.append(resp.get("raw_message") or {
+                    "role": "assistant", "content": final_text
+                })
+                working.append({
+                    "role": "user",
+                    "content": (
+                        "SYSTEM: You wrote profile or action data as plain text/JSON without "
+                        "calling tools. Call the real tools now (update_profile, get_profile, "
+                        "log_health_data, etc.) to apply those changes. Pass value=null to clear "
+                        "a field. Then reply with one short confirmation of what you saved."
+                    ),
+                })
+                continue
 
-            tool_results = []
-            for tc in tool_calls:
-                result = self.tools.execute(tc["name"], tc["input"], user_id)
-                tool_log.append({
-                    "name": tc["name"],
-                    "input": tc["input"],
-                    "result": result,
-                })
-                tool_results.append({
-                    "role": "tool",
-                    "tool_call_id": tc["id"],
-                    "content": result,
-                })
-            working.extend(tool_results)
+            break
 
         if not final_text:
-            # Tools may have run with no prose — still report briefly
-            if tool_log:
-                final_text = "Done."
-            else:
-                final_text = "Done."
+            final_text = "Done."
 
         if level != "none" and final_text:
             # Skip shortening for error fallbacks
