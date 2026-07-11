@@ -57,6 +57,7 @@ pytest
 | `listening_ai.auth` | `Authorization: Bearer` (also accepts `X-Session-Token`) |
 | `listening_ai.tools` | `ToolRegistry` + generic default tools |
 | `listening_ai.controller` | `ChatController` agentic loop (`run_loop` / `handle_message`) |
+| `listening_ai.brevity` | Reply shorten levels (`none` / `short` / `very_short`) + tool-first listening prompts |
 | `listening_ai.blueprint` | Flask blueprint: auth, profile, settings, inbox, chat |
 | `listening_ai.util` | Small shared helpers (e.g. UTC timestamps) |
 
@@ -157,6 +158,25 @@ registry.register(
 )
 app.register_blueprint(create_blueprint(tool_registry=registry, url_prefix="/listening"))
 ```
+
+### Reply brevity (listen more than you speak)
+
+```python
+from listening_ai import Settings, configure_app, ChatController
+
+configure_app(Settings(
+    openrouter_api_key="...",
+    reply_brevity="very_short",  # none | short | very_short
+))
+# Or per controller:
+controller = ChatController(tool_registry=registry, reply_brevity="very_short")
+```
+
+With `short` / `very_short`:
+1. The agent system prompt is extended to **prefer tools over monologue**.
+2. The final reply is **parsed into a shorter form** (LLM rewrite with local fallback), keeping tool outcomes.
+
+GreenDial sets `reply_brevity="very_short"` via `listening_bridge.py`.
 
 ### Use only the agentic loop (no blueprint)
 

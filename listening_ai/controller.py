@@ -4,6 +4,9 @@ ChatController - the reusable agentic chat loop.
 Call the LLM with registered tool schemas, execute any tool calls the model
 asks for against the ToolRegistry, feed results back, and repeat until the
 model stops calling tools (or max_steps is hit).
+
+Optional reply_brevity (none | short | very_short) steers the model to act
+with tools first and post-parses the final text into a shorter listen-first reply.
 """
 from __future__ import annotations
 
@@ -11,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from . import llm
 from . import store
+from .brevity import listening_system_suffix, normalize_level, shorten_reply
 from .settings import get_settings
 from .tools import ToolRegistry
 
@@ -33,10 +37,20 @@ class ChatController:
         tool_registry: Optional[ToolRegistry] = None,
         system_prompt: Optional[str] = None,
         max_steps: int = 6,
+        reply_brevity: Optional[str] = None,
     ):
         self.tools = tool_registry if tool_registry is not None else ToolRegistry()
         self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
         self.max_steps = max_steps
+        # None → read Settings.reply_brevity at call time
+        self.reply_brevity = reply_brevity
+
+    def _resolved_brevity(self, override: Optional[str] = None) -> str:
+        if override is not None:
+            return normalize_level(override)
+        if self.reply_brevity is not None:
+            return normalize_level(self.reply_brevity)
+        return normalize_level(get_settings().reply_brevity)
 
     def start_session(self, user_id: str, agent_id: str = "default") -> str:
         return store.create_chat_session(user_id, agent_id=agent_id)
@@ -72,6 +86,7 @@ class ChatController:
         messages: List[Dict[str, Any]],
         user_id: str,
         system_prompt: Optional[str] = None,
+        reply_brevity: Optional[str] = None,
     ) -> Tuple[str, str, List[Dict[str, Any]]]:
         """
         Run the agentic tool loop over an in-memory message list.
@@ -86,7 +101,9 @@ class ChatController:
         s = get_settings()
         model_used = s.openrouter_tools_model or s.openrouter_model
         tool_schemas = self.tools.schemas() if self.tools.has_tools() else None
-        prompt = system_prompt if system_prompt is not None else self.system_prompt
+        level = self._resolved_brevity(reply_brevity)
+        base_prompt = system_prompt if system_prompt is not None else self.system_prompt
+        prompt = (base_prompt or "") + listening_system_suffix(level)
 
         # Work on a copy so callers can keep their original list
         working = list(messages)
@@ -130,7 +147,22 @@ class ChatController:
             working.extend(tool_results)
 
         if not final_text:
-            final_text = "Done."
+            # Tools may have run with no prose — still report briefly
+            if tool_log:
+                final_text = "Done."
+            else:
+                final_text = "Done."
+
+        if level != "none" and final_text:
+            # Skip shortening for error fallbacks
+            if "trouble reaching the language model" not in final_text:
+                final_text = shorten_reply(
+                    final_text,
+                    level=level,
+                    tool_log=tool_log,
+                    use_llm=True,
+                )
+
         return final_text, model_used, tool_log
 
     # Back-compat alias

@@ -34,6 +34,11 @@ class Settings:
     llm_temperature: float = 0.7
     llm_max_tokens: int = 800
 
+    # Reply brevity: "none" | "short" | "very_short"
+    # Post-parse LLM replies so the bot listens more than it speaks.
+    # "very_short" also steers the agent loop to prioritize tool use.
+    reply_brevity: str = "none"
+
     # --- Auth ---
     token_expiry_seconds: int = 86400 * 7
 
@@ -91,6 +96,8 @@ class Settings:
             "OPENROUTER_SITE_NAME": "openrouter_site_name",
             "LLM_TEMPERATURE": "llm_temperature",
             "LLM_MAX_TOKENS": "llm_max_tokens",
+            "REPLY_BREVITY": "reply_brevity",
+            "LISTENING_AI_REPLY_BREVITY": "reply_brevity",
             "TOKEN_EXPIRY_SECONDS": "token_expiry_seconds",
             "DATA_DIR": "data_dir",
             "DB_PATH": "db_path",
@@ -131,6 +138,8 @@ class Settings:
             "DO_SPACES_ENDPOINT": os.environ.get("DO_SPACES_ENDPOINT"),
             "DO_SPACES_BUCKET": os.environ.get("DO_SPACES_BUCKET") or os.environ.get("S3_BUCKET"),
             "S3_PREFIX": os.environ.get("S3_PREFIX") or os.environ.get("LISTENING_AI_PREFIX"),
+            "REPLY_BREVITY": os.environ.get("LISTENING_AI_REPLY_BREVITY")
+            or os.environ.get("REPLY_BREVITY"),
             "TOKEN_EXPIRY_SECONDS": (
                 int(os.environ["LISTENING_AI_TOKEN_EXPIRY"])
                 if os.environ.get("LISTENING_AI_TOKEN_EXPIRY") else None

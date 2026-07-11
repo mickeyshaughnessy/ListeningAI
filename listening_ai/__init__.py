@@ -22,8 +22,9 @@ from .llm import (
     completion,
     get_last_model_used,
 )
+from .brevity import shorten_reply, normalize_level as normalize_reply_brevity
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 __all__ = [
     "Settings",
@@ -45,6 +46,8 @@ __all__ = [
     "call_llm_with_tools",
     "completion",
     "get_last_model_used",
+    "shorten_reply",
+    "normalize_reply_brevity",
     "__version__",
 ]
 

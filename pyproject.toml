@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "listening-ai"
-version = "0.1.1"
+version = "0.1.2"
 description = "Reusable conversational controller that listens better than it speaks"
 readme = "README.md"
 requires-python = ">=3.9"
