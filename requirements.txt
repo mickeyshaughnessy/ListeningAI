@@ -1,0 +1,7 @@
+# Runtime deps for the demo server. Prefer installing the package:
+#   pip install -e ".[spaces]"
+flask>=3.0
+flask-cors>=4.0
+requests>=2.31
+werkzeug>=3.0
+boto3>=1.34
