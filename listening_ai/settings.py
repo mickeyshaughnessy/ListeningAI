@@ -18,16 +18,18 @@ class Settings:
     # --- LLM (OpenRouter) ---
     openrouter_api_url: str = "https://openrouter.ai/api/v1/chat/completions"
     openrouter_api_key: str = ""
-    openrouter_model: str = "openai/gpt-oss-20b:free"
-    openrouter_tools_model: str = "openai/gpt-oss-20b:free"
+    openrouter_model: str = "google/gemma-4-26b-a4b-it:free"
+    openrouter_tools_model: str = "google/gemma-4-26b-a4b-it:free"
     openrouter_fallback_models: List[str] = field(default_factory=lambda: [
-        "openai/gpt-oss-120b:free",
-        "meta-llama/llama-3.3-70b-instruct:free",
-        "meta-llama/llama-3.2-3b-instruct:free",
+        "google/gemma-4-31b-it:free",
+        "openrouter/free",
+        "openai/gpt-oss-20b:free",
+        "nvidia/nemotron-nano-9b-v2:free",
     ])
     openrouter_tools_fallback_models: List[str] = field(default_factory=lambda: [
-        "openai/gpt-oss-120b:free",
-        "meta-llama/llama-3.3-70b-instruct:free",
+        "google/gemma-4-31b-it:free",
+        "openrouter/free",
+        "openai/gpt-oss-20b:free",
     ])
     openrouter_site_url: str = "https://github.com/mickeyshaughnessy/ListeningAI"
     openrouter_site_name: str = "ListeningAI"

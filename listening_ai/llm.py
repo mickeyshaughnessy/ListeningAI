@@ -221,6 +221,15 @@ def call_llm_with_tools(
                 continue
 
             text = msg_obj.get("content")
+            # Some free/reasoning models return content=null and put text in reasoning
+            if not (isinstance(text, str) and text.strip()):
+                reasoning = msg_obj.get("reasoning") or msg_obj.get("reasoning_content")
+                if isinstance(reasoning, str) and reasoning.strip():
+                    # Prefer last non-empty paragraph as the user-facing reply
+                    parts = [p.strip() for p in reasoning.strip().split("\n") if p.strip()]
+                    text = parts[-1] if parts else reasoning.strip()
+                    if len(text) > 600:
+                        text = text[:597].rstrip() + "…"
             raw_tool_calls = msg_obj.get("tool_calls") or []
             finish_reason = choice.get("finish_reason", "stop")
 
@@ -242,6 +251,12 @@ def call_llm_with_tools(
                     last_err = f"bad_tool_call_json: {e}"
                     print(f"[{label}] Could not parse tool call: {e}")
                     continue
+
+            # Empty text with no tools = treat as failure and try next model
+            if not tool_calls and not (isinstance(text, str) and text.strip()):
+                last_err = "empty_content"
+                print(f"[{label}] Empty content from {m}; trying next")
+                continue
 
             raw_message = {"role": "assistant", "content": text}
             if raw_tool_calls:
