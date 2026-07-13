@@ -23,8 +23,13 @@ from .llm import (
     get_last_model_used,
 )
 from .brevity import shorten_reply, normalize_level as normalize_reply_brevity
+from .proactive import (
+    DOC_DEFAULT_POLICY,
+    ProactivePolicy,
+    is_nothing_message,
+)
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 __all__ = [
     "Settings",
@@ -48,6 +53,9 @@ __all__ = [
     "get_last_model_used",
     "shorten_reply",
     "normalize_reply_brevity",
+    "ProactivePolicy",
+    "DOC_DEFAULT_POLICY",
+    "is_nothing_message",
     "__version__",
 ]
 

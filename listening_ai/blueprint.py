@@ -231,4 +231,50 @@ def create_blueprint(tool_registry=None, system_prompt=None, url_prefix="", name
         result = controller.handle_message(request.user_id, session_id, message)
         return jsonify(result)
 
+    # -------------------------------------------------------- proactive --
+    # Portable demo of unprompted-message gates. Hosts like GreenDial expose
+    # their own identity-bound route (GET /Doc); this endpoint uses ListeningAI
+    # store users + optional host-provided generator via request hook.
+
+    @bp.route("/proactive", methods=["GET"])
+    @require_auth
+    def proactive_poll():
+        """
+        Check whether an unprompted assistant message is allowed.
+
+        Query params:
+          force=1 — bypass time gates (dev only; still requires auth)
+
+        Without a host generator, returns the policy decision only
+        (messages always empty). Hosts that inject a generator on the
+        blueprint factory can extend this later.
+        """
+        from .proactive import DOC_DEFAULT_POLICY
+
+        force = (request.args.get("force") or "").strip() in ("1", "true", "yes")
+        user = store.get_user(request.user_id) or {}
+        settings = user.get("settings") or {}
+        profile = user.get("profile") or {}
+        state = (user.get("proactive") or {}) if isinstance(user.get("proactive"), dict) else {}
+
+        decision = DOC_DEFAULT_POLICY.evaluate(
+            last_sent_at=state.get("last_sent_at"),
+            sent_dates=state.get("sent_dates") or [],
+            last_activity_at=user.get("last_chat") or state.get("last_activity_at"),
+            notifications_enabled=settings.get("notifications_enabled", True),
+            has_profile=bool(profile),
+            has_transcript=bool(user.get("transcript") or state.get("has_transcript")),
+            force=force,
+        )
+        return jsonify({
+            "messages": [],
+            "allowed": decision["allowed"],
+            "reason": decision.get("reason"),
+            "next_eligible_at": decision.get("next_eligible_at"),
+            "note": (
+                "Portable policy check only. GreenDial Doc delivery is GET /Doc "
+                "on the host app (separate identity/store)."
+            ),
+        })
+
     return bp

@@ -58,7 +58,8 @@ pytest
 | `listening_ai.tools` | `ToolRegistry` + generic default tools |
 | `listening_ai.controller` | `ChatController` agentic loop (`run_loop` / `handle_message`) |
 | `listening_ai.brevity` | Reply shorten levels (`none` / `short` / `very_short`) + tool-first listening prompts |
-| `listening_ai.blueprint` | Flask blueprint: auth, profile, settings, inbox, chat |
+| `listening_ai.proactive` | `ProactivePolicy` — rate gates for unprompted / agent-initiated messages |
+| `listening_ai.blueprint` | Flask blueprint: auth, profile, settings, inbox, chat, proactive |
 | `listening_ai.util` | Small shared helpers (e.g. UTC timestamps) |
 
 ## HTTP API (blueprint)
@@ -81,6 +82,7 @@ Default routes (no `url_prefix`):
 | GET | `/chat/sessions` | yes | List chat sessions |
 | GET | `/chat/history?session_id=` | yes | Transcript |
 | POST | `/chat` | yes | Agentic chat turn |
+| GET | `/proactive` | yes | Unprompted-message **policy check** (no generation by default) |
 
 Auth: `Authorization: Bearer <token>` or `X-Session-Token: <token>`.
 
@@ -224,6 +226,13 @@ GreenDial installs this package, configures Spaces under
 `greendial/listening_ai/`, mounts the blueprint at `/listening`, and routes its
 internal agentic health-tool loop through `ChatController.run_loop`. See
 `GreenDial/listening_bridge.py`.
+
+**Unprompted Doc messages:** GreenDial exposes host-native **`GET /Doc`** (GreenDial
+session + health user store). It uses `listening_ai.ProactivePolicy` /
+`DOC_DEFAULT_POLICY` for rate limits (default: 2/day, 6h interval, 30m quiet after
+chat) and `listening_ai.completion` for on-demand generation. The portable
+`GET /listening/proactive` route only returns the policy decision for ListeningAI
+store users — it does **not** share identity with GreenDial Doc.
 
 ## Env vars
 
